@@ -1,0 +1,88 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # creating releases on tags
+  actions: read     # SignPath reads the uploaded artifact
+
+jobs:
+  build:
+    runs-on: windows-2022   # GitHub-hosted runners are required for SignPath Foundation projects
+    env:
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Check versions
+        id: ver
+        shell: pwsh
+        run: ./tools/check-release.ps1 -Versions -Tag "${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}"
+
+      - name: Build and run self-tests
+        shell: cmd
+        run: call build.cmd Release
+
+      # Only GScreen's own binaries go to SignPath; the rest of the package is already signed by Microsoft.
+      - name: Stage binaries for signing
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force to-sign | Out-Null
+          'GScreen.Core.exe','GScreen.Watchdog.exe','GScreen.App.exe','GScreen.App.dll' |
+            ForEach-Object { Copy-Item "out/GScreen/$_" to-sign/ }
+
+      - name: Upload unsigned binaries
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: gscreen-unsigned-${{ steps.ver.outputs.version }}
+          path: to-sign/
+
+      # Releases only: every SignPath Foundation signing request needs a manual approval.
+      - name: Sign with SignPath
+        if: startsWith(github.ref, 'refs/tags/v') && env.SIGNPATH_API_TOKEN != ''
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 14400   # time for a maintainer to approve
+          output-artifact-directory: signed
+          parameters: |
+            version: "${{ steps.ver.outputs.version }}"
+
+      - name: Put signed binaries into the package
+        if: startsWith(github.ref, 'refs/tags/v') && env.SIGNPATH_API_TOKEN != ''
+        shell: pwsh
+        run: |
+          Copy-Item signed/* out/GScreen/ -Force
+          ./tools/check-release.ps1 -Signatures -Package out/GScreen
+
+      - name: Zip package
+        shell: pwsh
+        run: Compress-Archive -Path out/GScreen/* -DestinationPath "GScreen-${{ steps.ver.outputs.version }}-win-x64.zip"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: GScreen-${{ steps.ver.outputs.version }}-win-x64
+          path: GScreen-${{ steps.ver.outputs.version }}-win-x64.zip
+
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/v') && env.SIGNPATH_API_TOKEN != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" "GScreen-${{ steps.ver.outputs.version }}-win-x64.zip" --title "GScreen ${{ steps.ver.outputs.version }}" --notes-file docs/release-notes.md

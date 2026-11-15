@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Paste this into the SignPath project's artifact configuration.
+  The CI uploads a zip with only GScreen's own four binaries (every other DLL in the package is already signed by Microsoft).
+  product-name / product-version pin the metadata SignPath Foundation requires on each signed file.
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" />
+  </parameters>
+  <zip-file>
+    <pe-file path="GScreen.Core.exe" product-name="GScreen" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="GScreen.Watchdog.exe" product-name="GScreen" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="GScreen.App.exe" product-name="GScreen" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="GScreen.App.dll" product-name="GScreen" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

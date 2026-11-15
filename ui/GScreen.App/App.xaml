@@ -1,0 +1,25 @@
+<Application
+    x:Class="GScreen.App.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <Color x:Key="ZoneAColor">#0E8F84</Color>
+                    <Color x:Key="ZoneBColor">#B87410</Color>
+                    <Color x:Key="ZoneCColor">#7446D6</Color>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <Color x:Key="ZoneAColor">#2FC2B4</Color>
+                    <Color x:Key="ZoneBColor">#E3A33E</Color>
+                    <Color x:Key="ZoneCColor">#A584F2</Color>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+            <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas</FontFamily>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
