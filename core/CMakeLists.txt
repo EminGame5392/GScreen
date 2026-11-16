@@ -23,4 +23,5 @@ target_link_libraries(GScreen.Core PRIVATE
   d3d11 dxgi d3dcompiler user32 gdi32 shell32 advapi32 ole32 windowsapp)
 
 # Self-test target: layout math and JSON, no GPU needed.
-add_executable(GScreen.Tests src/tests.cpp src/Json.cpp src/Layout.cpp)
+add_executable(GScreen.Tests src/tests.cpp src/Json.cpp src/Layout.cpp src/VddBackend.cpp src/Log.cpp)
+target_link_libraries(GScreen.Tests PRIVATE shell32 ole32)

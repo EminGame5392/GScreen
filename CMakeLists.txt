@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 # Keep in sync with <Version> in ui/GScreen.App/GScreen.App.csproj (CI checks this).
-project(GScreen LANGUAGES CXX RC VERSION 0.1.0)
+project(GScreen LANGUAGES CXX RC VERSION 0.1.1)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

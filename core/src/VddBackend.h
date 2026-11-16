@@ -23,6 +23,9 @@ private:
     bool Send(const std::wstring& command, std::wstring* reply = nullptr) const;
 };
 
+// The driver answers some commands in ANSI and others in UTF-16LE (exposed for tests).
+std::wstring DecodeVddReply(const unsigned char* data, size_t size);
+
 // Builds the replacement text for the settings file (exposed for tests).
 std::string PatchVddSettings(const std::string& original, int count, const std::vector<ZoneRect>& zones, int refreshHz,
                              const std::string& gpuName);

@@ -16,7 +16,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <PublishTrimmed>false</PublishTrimmed>
     <!-- Keep in sync with project(VERSION) in the root CMakeLists.txt. -->
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Product>GScreen</Product>
     <Company>GScreen contributors</Company>
     <Copyright>MIT License</Copyright>

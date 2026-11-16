@@ -1,6 +1,7 @@
 // Self-tests for pure logic (no GPU, no driver). Run: GScreen.Tests.exe → exit code 0 on success.
 #include "Json.h"
 #include "Layout.h"
+#include "VddBackend.h"
 #include <cstdio>
 
 using namespace gs;
@@ -62,6 +63,34 @@ int main() {
     CHECK(!Json::parse("{bad").has_value());
     CHECK(!Json::parse("[1,2").has_value());
     CHECK(Json::parse("\"\\u0410\"")->asString() == "\xD0\x90");
+
+    // VDD pipe replies, as measured on VDD 25.7.23.
+    const unsigned char pong[] = {'P', 'O', 'N', 'G'};
+    CHECK(DecodeVddReply(pong, 4) == L"PONG");
+    const unsigned char settings[] = {'S', 0, 'E', 0, 'T', 0, ' ', 0, 0, 0};
+    CHECK(DecodeVddReply(settings, sizeof settings) == L"SET");
+    CHECK(DecodeVddReply(pong, 0).empty());
+
+    // Settings patch against the layout of the driver's own default vdd_settings.xml.
+    const std::string vddDefault =
+        "<?xml version='1.0' encoding='utf-8'?>\n<vdd_settings>\n    <monitors>\n        <count>1</count>\n    </monitors>\n"
+        "    <gpu>\n        <friendlyname>default</friendlyname>\n    </gpu>\n"
+        "\t<global>\n\t\t<g_refresh_rate>60</g_refresh_rate>\n\t</global>\n"
+        "    <resolutions>\n        <resolution>\n            <width>800</width>\n            <height>600</height>\n"
+        "            <refresh_rate>30</refresh_rate>\n        </resolution>\n    </resolutions>\n"
+        "    <options>\n\t\t<HardwareCursor>true</HardwareCursor>\n    </options>\n</vdd_settings>\n";
+    auto zones = ComputeZones(5120, 1440, {1, 1, 1});
+    std::string patched = PatchVddSettings(vddDefault, 3, zones, 240, "NVIDIA GeForce RTX 4060");
+    CHECK(patched.find("<count>3</count>") != std::string::npos);
+    CHECK(patched.find("<friendlyname>NVIDIA GeForce RTX 4060</friendlyname>") != std::string::npos);
+    CHECK(patched.find("<width>800</width>") == std::string::npos);
+    CHECK(patched.find("<width>1704</width>") != std::string::npos);
+    CHECK(patched.find("<width>1712</width>") != std::string::npos);
+    CHECK(patched.find("<refresh_rate>240</refresh_rate>") != std::string::npos);
+    CHECK(patched.find("<HardwareCursor>true</HardwareCursor>") != std::string::npos); // other options untouched
+    CHECK(patched.find("<g_refresh_rate>60</g_refresh_rate>") != std::string::npos);
+    // Patching twice is stable.
+    CHECK(PatchVddSettings(patched, 3, zones, 240, "NVIDIA GeForce RTX 4060") == patched);
 
     std::printf(g_failed ? "%d check(s) failed\n" : "all checks passed\n", g_failed);
     return g_failed ? 1 : 0;
