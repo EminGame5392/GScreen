@@ -1,4 +1,5 @@
 #include "DisplayTopology.h"
+#include "VddBackend.h"
 #include "Log.h"
 #include <algorithm>
 #include <cmath>
@@ -37,7 +38,7 @@ void FillTargetName(DisplayInfo& d) {
     if (DisplayConfigGetDeviceInfo(&tn.header) == ERROR_SUCCESS) {
         d.friendlyName = tn.monitorFriendlyDeviceName;
         d.devicePath = tn.monitorDevicePath;
-        d.isVirtual = IsVirtualTech(tn.outputTechnology);
+        d.isVirtual = IsVirtualTech(tn.outputTechnology) || IsVddMonitorPath(d.devicePath);
     }
     DISPLAYCONFIG_TARGET_PREFERRED_MODE pm{};
     pm.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_PREFERRED_MODE;

@@ -33,10 +33,12 @@ public:
     const Config& GetConfig() const { return config_; }
     // Preview: composite goes to a window and the panel stays on the desktop. Command-line only, never saved.
     void SetPreview(bool on) { preview_ = on; }
+    void SetWatchdogRunning(bool on) { watchdog_ = on; }
 
 private:
     bool EnterSplit(const Layout& layout, std::string& error);
-    bool WaitForVirtualDisplays(size_t count, int timeoutMs);
+    bool WaitForVirtualDisplays(size_t count, int timeoutMs, int stableMs);
+    bool AttachVirtualDisplays(size_t count);
     std::string PanelGpuName(const DisplayInfo& panel);
     Presentation ChoosePresentation() const;
 
@@ -47,6 +49,7 @@ private:
     Mode mode_ = Mode::Merged;
     Presentation presentation_ = Presentation::Window;
     bool preview_ = false;
+    bool watchdog_ = false;
     bool licensed_ = false;
     std::string lastError_;
     std::vector<ZoneRect> zones_;

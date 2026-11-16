@@ -71,6 +71,12 @@ int main() {
     CHECK(DecodeVddReply(settings, sizeof settings) == L"SET");
     CHECK(DecodeVddReply(pong, 0).empty());
 
+    // VDD monitors report HDMI as output technology; the device path identifies them.
+    CHECK(IsVddMonitorPath(LR"(\\?\DISPLAY#MTT1337#1&28a6823a&0&UID256#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7})"));
+    CHECK(IsVddMonitorPath(LR"(\\?\display#mtt1337#1&28a6823a&0&uid257#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7})"));
+    CHECK(!IsVddMonitorPath(LR"(\\?\DISPLAY#SAME05C#5&1acee2bb&0&UID4357#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7})"));
+    CHECK(!IsVddMonitorPath(L""));
+
     // Settings patch against the layout of the driver's own default vdd_settings.xml.
     const std::string vddDefault =
         "<?xml version='1.0' encoding='utf-8'?>\n<vdd_settings>\n    <monitors>\n        <count>1</count>\n    </monitors>\n"

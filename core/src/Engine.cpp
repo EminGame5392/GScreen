@@ -45,7 +45,10 @@ bool Engine::Init() {
         LogError("No physical display found");
     }
     // Left over from a crash (panel removed or parked, virtual monitors attached)? Start clean.
-    if (!FindVirtualDisplays(all).empty() || (havePanel_ && (IsPanelRemovedFromDesktop(panel_) || panel_.x != 0 || panel_.y != 0))) {
+    // Inactive VDD monitors are normal (the driver keeps them around); only attached ones are leftovers.
+    bool virtualsAttached = false;
+    for (auto* d : FindVirtualDisplays(all)) virtualsAttached |= d->active;
+    if (virtualsAttached || (havePanel_ && (IsPanelRemovedFromDesktop(panel_) || panel_.x != 0 || panel_.y != 0))) {
         LogWarn("Found a leftover split state; restoring");
         RestoreMerged();
     }
@@ -67,12 +70,40 @@ std::string Engine::PanelGpuName(const DisplayInfo& panel) {
     return Narrow(d.Description);
 }
 
-bool Engine::WaitForVirtualDisplays(size_t count, int timeoutMs) {
-    auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
-    while (std::chrono::steady_clock::now() < end) {
+// VDD reloads its adapter asynchronously after SETDISPLAYCOUNT: the old monitors vanish and the
+// new ones appear a moment later. Wait until the wanted count has been present (same targets)
+// for stableMs, so we never grab monitors that are about to disappear.
+bool Engine::WaitForVirtualDisplays(size_t count, int timeoutMs, int stableMs) {
+    using clock = std::chrono::steady_clock;
+    auto end = clock::now() + std::chrono::milliseconds(timeoutMs);
+    std::vector<TargetKey> seen;
+    auto since = clock::now();
+    while (clock::now() < end) {
         auto all = EnumerateDisplays();
-        if (FindVirtualDisplays(all).size() >= count) return true;
+        auto v = FindVirtualDisplays(all);
+        std::vector<TargetKey> now;
+        for (auto* d : v) now.push_back(d->key);
+        if (now != seen) { seen = now; since = clock::now(); }
+        if (seen.size() >= count && clock::now() - since >= std::chrono::milliseconds(stableMs)) return true;
         PumpFor(250);
+    }
+    LogWarn("Virtual displays: wanted {}, have {}", count, seen.size());
+    return false;
+}
+
+bool Engine::AttachVirtualDisplays(size_t count) {
+    for (int attempt = 1; attempt <= 3; ++attempt) {
+        if (!WaitForVirtualDisplays(count, attempt == 1 ? 15000 : 8000, 1500)) return false;
+        auto virtuals = FindVirtualDisplays(EnumerateDisplays());
+        if (virtuals.size() < count) continue;
+        std::vector<TargetKey> keys;
+        for (size_t i = 0; i < count; ++i) keys.push_back(virtuals[i]->key);
+        if (!AttachTargets(keys)) LogWarn("AttachTargets failed (attempt {})", attempt);
+        PumpFor(700);
+        size_t active = 0;
+        for (auto* d : FindVirtualDisplays(EnumerateDisplays())) active += d->active ? 1 : 0;
+        if (active >= count) return true;
+        LogWarn("Attach attempt {}: {} of {} virtual displays active", attempt, active, count);
     }
     return false;
 }
@@ -94,17 +125,10 @@ bool Engine::EnterSplit(const Layout& layout, std::string& error) {
 
     // 1. Virtual monitors with the zone resolutions.
     if (!vdd_.Configure(zones_, hz, PanelGpuName(panel_))) { error = "Не удалось настроить драйвер VDD"; return false; }
-    if (!WaitForVirtualDisplays(zones_.size(), 10000)) { error = "Виртуальные мониторы не появились за 10 секунд"; return false; }
+    if (!AttachVirtualDisplays(zones_.size())) { error = "Windows не подключила виртуальные мониторы"; return false; }
 
     auto all = EnumerateDisplays();
     auto virtuals = FindVirtualDisplays(all);
-    std::vector<TargetKey> keys;
-    for (size_t i = 0; i < zones_.size(); ++i) keys.push_back(virtuals[i]->key);
-    if (!AttachTargets(keys)) { error = "Windows не подключила виртуальные мониторы"; return false; }
-    PumpFor(500);
-
-    all = EnumerateDisplays();
-    virtuals = FindVirtualDisplays(all);
     virtuals.resize(std::min(virtuals.size(), zones_.size()));
     const DisplayInfo* livePanel = FindPhysicalPanel(all);
     bool ok = false;
@@ -281,6 +305,7 @@ Json Engine::Status() {
     s.set("presentation", PresentationName(mode_ == Mode::Split ? presentation_ : ChoosePresentation()));
     s.set("exclusiveLicensed", licensed_);
     s.set("vddInstalled", vdd_.IsInstalled());
+    s.set("watchdog", watchdog_);
     s.set("error", lastError_);
     if (havePanel_) {
         Json p(Json::Object{});

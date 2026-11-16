@@ -3,6 +3,7 @@
 #include <shlobj.h>
 #include <mutex>
 #include <cstdio>
+#include <share.h>
 #include <chrono>
 
 namespace gs {
@@ -41,7 +42,8 @@ void LogInit() {
     std::lock_guard lock(g_logMutex);
     if (g_logFile) return;
     std::wstring path = AppDataDir() + L"\\core.log";
-    _wfopen_s(&g_logFile, path.c_str(), L"a, ccs=UTF-8");
+    // Shared so the log can be read (and tailed) while GScreen runs.
+    g_logFile = _wfsopen(path.c_str(), L"a, ccs=UTF-8", _SH_DENYNO);
 }
 
 void LogWrite(const std::string& level, const std::string& msg) {

@@ -30,9 +30,11 @@ std::wstring ExeDir() {
     return s.substr(0, s.find_last_of(L'\\'));
 }
 
-void LaunchSibling(const wchar_t* exe, const std::wstring& args) {
+bool LaunchSibling(const wchar_t* exe, const std::wstring& args) {
     std::wstring path = ExeDir() + L"\\" + exe;
-    ShellExecuteW(nullptr, L"open", path.c_str(), args.empty() ? nullptr : args.c_str(), ExeDir().c_str(), SW_SHOWNORMAL);
+    auto rc = (INT_PTR)ShellExecuteW(nullptr, L"open", path.c_str(), args.empty() ? nullptr : args.c_str(), ExeDir().c_str(), SW_SHOWNORMAL);
+    if (rc <= 32) LogWarn("Could not start {}: ShellExecute {} (error {})", Narrow(exe), (long long)rc, GetLastError());
+    return rc > 32;
 }
 
 void UpdateTip(HWND hwnd) {
@@ -186,7 +188,8 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR cmdLine, int) {
     UpdateTip(hwnd);
 
     // The watchdog brings the panel back if this process crashes or hangs (Ctrl+Alt+Shift+R).
-    LaunchSibling(L"GScreen.Watchdog.exe", L"--pid " + std::to_wstring(GetCurrentProcessId()));
+    // Smart App Control can block the unsigned watchdog; then crash recovery and Ctrl+Alt+Shift+R are unavailable.
+    g_engine.SetWatchdogRunning(LaunchSibling(L"GScreen.Watchdog.exe", L"--pid " + std::to_wstring(GetCurrentProcessId())));
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {

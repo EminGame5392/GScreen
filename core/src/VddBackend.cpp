@@ -1,4 +1,5 @@
 #include "VddBackend.h"
+#include <cwctype>
 #include "Log.h"
 #include <windows.h>
 #include <fstream>
@@ -23,6 +24,12 @@ std::wstring DecodeVddReply(const unsigned char* data, size_t size) {
         for (size_t i = 0; i < size; ++i) out += (wchar_t)data[i];
     while (!out.empty() && (out.back() == L'\0' || out.back() == L' ')) out.pop_back();
     return out;
+}
+
+bool IsVddMonitorPath(const std::wstring& devicePath) {
+    std::wstring upper = devicePath;
+    for (auto& c : upper) c = (wchar_t)towupper(c);
+    return upper.find(L"#MTT1337#") != std::wstring::npos;
 }
 
 bool VddBackend::Send(const std::wstring& command, std::wstring* reply) const {

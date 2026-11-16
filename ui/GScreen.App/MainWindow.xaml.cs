@@ -310,6 +310,10 @@ public sealed partial class MainWindow : Window
                 "Установите Virtual Display Driver: winget install --id=VirtualDrivers.Virtual-Display-Driver -e");
         else if (!string.IsNullOrEmpty(err) && !Banner.IsOpen)
             ShowBanner(InfoBarSeverity.Warning, "Последняя ошибка", err);
+        else if (s["watchdog"]?.GetValue<bool>() == false && !Banner.IsOpen)
+            ShowBanner(InfoBarSeverity.Warning, "Аварийное восстановление недоступно",
+                "Windows (Smart App Control) заблокировала GScreen.Watchdog.exe. Если GScreen зависнет в режиме разделения, " +
+                "экран вернёт запуск «GScreen.Core.exe --restore». Это исправит подписанный релиз или отключение Smart App Control.");
 
         string where = presentation switch
         {
