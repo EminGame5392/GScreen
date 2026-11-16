@@ -126,7 +126,7 @@ bool Engine::EnterSplit(const Layout& layout, std::string& error) {
 
     // 1. Virtual monitors with the zone resolutions.
     const int panelHz = std::max(60, (int)std::lround(panel_.refreshHz));
-    if (!vdd_.Configure(W, H, panelHz, PanelGpuName(panel_))) { error = "Не удалось настроить драйвер VDD"; return false; }
+    if (!vdd_.Configure(zones_, W, H, panelHz, PanelGpuName(panel_))) { error = "Не удалось настроить драйвер VDD"; return false; }
     if (!AttachVirtualDisplays(zones_.size())) { error = "Windows не подключила виртуальные мониторы"; return false; }
 
     auto all = EnumerateDisplays();

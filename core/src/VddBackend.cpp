@@ -73,21 +73,64 @@ static void ReplaceElement(std::string& xml, const std::string& tag, const std::
     else xml.insert(rootEnd, block);
 }
 
-std::vector<int> ZoneWidthGrid(int panelW) {
-    std::set<int> widths;
-    int maxW = panelW - kMinZoneWidth; // the widest zone still leaves room for one more
-    if (maxW < kMinZoneWidth) return {panelW};
-    for (int w = kMinZoneWidth; w <= maxW; w += kWidthAlign) {
-        widths.insert(w);                                       // aligned zones
-        if (int last = panelW - w; last >= kMinZoneWidth) widths.insert(last); // the last zone absorbs rounding
-        for (int w2 = kMinZoneWidth; w2 <= maxW; w2 += kWidthAlign) // 3 zones: last = panelW - a - b
-            if (int last = panelW - w - w2; last >= kMinZoneWidth) widths.insert(last);
-    }
-    return {widths.begin(), widths.end()};
+// Inner text of the first <tag>…</tag> at or after `from`; npos-safe. `end` gets the position after </tag>.
+static std::string Inner(const std::string& xml, const std::string& tag, size_t from = 0, size_t* end = nullptr) {
+    std::string open = "<" + tag + ">", close = "</" + tag + ">";
+    size_t a = xml.find(open, from);
+    if (a == std::string::npos) return {};
+    size_t b = xml.find(close, a);
+    if (b == std::string::npos) return {};
+    if (end) *end = b + close.size();
+    return xml.substr(a + open.size(), b - a - open.size());
 }
 
-std::string PatchVddSettings(const std::string& original, int panelW, int panelH, int refreshHz, const std::string& gpuName) {
+static int ToInt(const std::string& s) {
+    try { return std::stoi(s); } catch (...) { return 0; }
+}
+
+VddSettings ParseVddSettings(const std::string& xml) {
+    VddSettings s;
+    s.count = ToInt(Inner(xml, "count"));
+    s.gpu = Inner(xml, "friendlyname");
+    std::string res = Inner(xml, "resolutions");
+    size_t pos = 0, next = 0;
+    for (;;) {
+        std::string block = Inner(res, "resolution", pos, &next);
+        if (block.empty()) break;
+        int w = ToInt(Inner(block, "width")), h = ToInt(Inner(block, "height"));
+        if (w > 0 && h > 0) s.sizes.insert({w, h});
+        pos = next;
+    }
+    return s;
+}
+
+std::set<int> RequiredWidths(int panelW, const std::vector<ZoneRect>& zones) {
+    std::set<int> widths;
+    for (auto& p : DefaultPresets())
+        for (auto& z : ComputeZones(panelW, 1, p.ratios)) widths.insert(z.width);
+    for (auto& z : zones) widths.insert(z.width);
+    return widths;
+}
+
+bool VddSettingsSatisfy(const std::string& xml, const std::set<int>& widths, int panelH, const std::string& gpuName) {
+    VddSettings s = ParseVddSettings(xml);
+    if (s.count != kMaxZones) return false;
+    if (!gpuName.empty() && s.gpu != gpuName) return false;
+    for (int w : widths)
+        if (!s.sizes.count({w, panelH})) return false;
+    return true;
+}
+
+std::string PatchVddSettings(const std::string& original, const std::set<int>& widthsIn, int panelH, int refreshHz,
+                             const std::string& gpuName) {
     std::string xml = original.empty() ? "<?xml version='1.0' encoding='utf-8'?>\n<vdd_settings>\n</vdd_settings>\n" : original;
+
+    // Keep widths registered earlier (so going back to an old custom layout needs no reload), but cap the
+    // list: VDD 25.7.23 creates no monitors at all with ~120 resolutions.
+    std::set<int> widths = widthsIn;
+    for (auto& [w, h] : ParseVddSettings(xml).sizes)
+        if (h == panelH && w >= kMinZoneWidth) widths.insert(w);
+    if (widths.size() > kMaxVddWidths) widths = widthsIn;
 
     // <count> lives inside <monitors>; the driver matches by element name only.
     ReplaceElement(xml, "count", std::to_string(kMaxZones));
@@ -95,11 +138,10 @@ std::string PatchVddSettings(const std::string& original, int panelW, int panelH
 
     std::ostringstream res;
     res << "\n";
-    const int h = panelH;
-    for (int w : ZoneWidthGrid(panelW)) {
+    for (int w : widths) {
         res << "    <resolution>\n"
             << "      <width>" << w << "</width>\n"
-            << "      <height>" << h << "</height>\n"
+            << "      <height>" << panelH << "</height>\n"
             << "      <refresh_rate>" << refreshHz << "</refresh_rate>\n"
             << "    </resolution>\n";
     }
@@ -108,17 +150,20 @@ std::string PatchVddSettings(const std::string& original, int panelW, int panelH
     return xml;
 }
 
-bool VddBackend::Configure(int panelW, int panelH, int refreshHz, const std::string& gpuName) {
+bool VddBackend::Configure(const std::vector<ZoneRect>& zones, int panelW, int panelH, int refreshHz,
+                           const std::string& gpuName) {
     std::string original;
     {
         std::ifstream f(SettingsPath(), std::ios::binary);
         if (f) { std::stringstream ss; ss << f.rdbuf(); original = ss.str(); }
     }
-    std::string patched = PatchVddSettings(original, panelW, panelH, refreshHz, gpuName);
-    if (patched == original) {
-        LogInfo("VDD settings already match the panel; no driver reload");
+    // Compare content, not text: the driver re-serialises the file on its own reload.
+    std::set<int> widths = RequiredWidths(panelW, zones);
+    if (VddSettingsSatisfy(original, widths, panelH, gpuName)) {
+        LogInfo("VDD already offers these modes; no driver reload");
         return true;
     }
+    std::string patched = PatchVddSettings(original, widths, panelH, refreshHz, gpuName);
     {
         // Keep a one-time backup of the user's original settings.
         std::wstring backup = SettingsPath() + L".gscreen-backup";
@@ -134,13 +179,13 @@ bool VddBackend::Configure(int panelW, int panelH, int refreshHz, const std::str
         f << patched;
     }
     // SETDISPLAYCOUNT writes <count> and reloads the adapter, which re-reads the modes. On VDD 25.7.23 the
-    // reload is a driver crash that Windows recovers from, hence the "only when the file changed" rule above.
+    // reload is a driver crash that Windows recovers from, so it must stay rare (first run, new custom width).
     if (!Send(L"SETDISPLAYCOUNT " + std::to_wstring(kMaxZones))) {
         LogError("VDD pipe did not accept SETDISPLAYCOUNT");
         return false;
     }
-    LogInfo("VDD settings rewritten ({} monitors, {} widths, height {}, {} Hz); driver reloading",
-            kMaxZones, ZoneWidthGrid(panelW).size(), panelH, refreshHz);
+    LogInfo("VDD settings rewritten ({} monitors, {} widths, height {}); driver reloading",
+            kMaxZones, ParseVddSettings(patched).sizes.size(), panelH);
     return true;
 }
 

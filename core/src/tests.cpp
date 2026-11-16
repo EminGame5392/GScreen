@@ -3,6 +3,7 @@
 #include "Layout.h"
 #include "VddBackend.h"
 #include <algorithm>
+#include <set>
 #include <cstdio>
 
 using namespace gs;
@@ -86,29 +87,47 @@ int main() {
         "    <resolutions>\n        <resolution>\n            <width>800</width>\n            <height>600</height>\n"
         "            <refresh_rate>30</refresh_rate>\n        </resolution>\n    </resolutions>\n"
         "    <options>\n\t\t<HardwareCursor>true</HardwareCursor>\n    </options>\n</vdd_settings>\n";
-    // Every width ComputeZones can produce is pre-registered, so layouts never need a driver reload.
-    auto grid = ZoneWidthGrid(5120);
-    CHECK(grid.size() == 121 && grid.front() == 640 && grid.back() == 4480);
-    for (auto ratios : std::vector<std::vector<double>>{{1, 1, 1}, {1, 2, 1}, {1, 1}, {7, 3}, {100, 1}, {1, 100, 1}, {0.37, 0.41, 0.22}})
-        for (auto& r : ComputeZones(5120, 1440, ratios))
-            CHECK(std::find(grid.begin(), grid.end(), r.width) != grid.end());
-    auto odd = ZoneWidthGrid(3440); // panel width not a multiple of the alignment
-    for (auto ratios : std::vector<std::vector<double>>{{1, 1, 1}, {1, 1}, {0.37, 0.41, 0.22}})
-        for (auto& r : ComputeZones(3440, 1440, ratios))
-            CHECK(std::find(odd.begin(), odd.end(), r.width) != odd.end());
+    // Widths registered with the driver: every built-in preset on the G9 (multiples of 32), plus the custom zones.
+    const std::set<int> presetWidths{1280, 1536, 1696, 1728, 2560, 3584};
+    CHECK(RequiredWidths(5120, {}) == presetWidths);
+    auto custom = ComputeZones(5120, 1440, {0.37, 0.41, 0.22});
+    auto withCustom = RequiredWidths(5120, custom);
+    for (auto& c : custom) CHECK(withCustom.count(c.width) == 1);
 
-    std::string patched = PatchVddSettings(vddDefault, 5120, 1440, 240, "NVIDIA GeForce RTX 4060");
+    const std::string gpu = "NVIDIA GeForce RTX 4060";
+    std::string patched = PatchVddSettings(vddDefault, presetWidths, 1440, 240, gpu);
     CHECK(patched.find("<count>3</count>") != std::string::npos);
     CHECK(patched.find("<friendlyname>NVIDIA GeForce RTX 4060</friendlyname>") != std::string::npos);
     CHECK(patched.find("<width>800</width>") == std::string::npos);
     CHECK(patched.find("<width>1696</width>") != std::string::npos);
-    CHECK(patched.find("<width>1728</width>") != std::string::npos);
-    CHECK(patched.find("<width>4480</width>") != std::string::npos);
+    CHECK(patched.find("<width>3584</width>") != std::string::npos);
     CHECK(patched.find("<refresh_rate>240</refresh_rate>") != std::string::npos);
     CHECK(patched.find("<HardwareCursor>true</HardwareCursor>") != std::string::npos); // other options untouched
     CHECK(patched.find("<g_refresh_rate>60</g_refresh_rate>") != std::string::npos);
-    // Patching twice is stable.
-    CHECK(PatchVddSettings(patched, 5120, 1440, 240, "NVIDIA GeForce RTX 4060") == patched);
+    CHECK(ParseVddSettings(patched).sizes.size() == presetWidths.size());
+    CHECK(PatchVddSettings(patched, presetWidths, 1440, 240, gpu) == patched); // stable
+
+    // "Already configured" is judged by content: the driver re-serialises the file after its reload.
+    CHECK(!VddSettingsSatisfy(vddDefault, presetWidths, 1440, gpu));
+    CHECK(VddSettingsSatisfy(patched, presetWidths, 1440, gpu));
+    std::string reserialised = patched;
+    reserialised.replace(0, reserialised.find("?>") + 2, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+    for (size_t at; (at = reserialised.find("      <width>")) != std::string::npos;) reserialised.replace(at, 6, "\t\t\t");
+    CHECK(VddSettingsSatisfy(reserialised, presetWidths, 1440, gpu));
+    CHECK(!VddSettingsSatisfy(patched, withCustom, 1440, gpu)); // a new custom width needs a reload
+    CHECK(!VddSettingsSatisfy(patched, presetWidths, 1440, "Intel(R) UHD Graphics"));
+
+    // Earlier custom widths stay registered, so going back to that layout needs no reload.
+    std::string withOld = PatchVddSettings(patched, withCustom, 1440, 240, gpu);
+    CHECK(VddSettingsSatisfy(PatchVddSettings(withOld, presetWidths, 1440, 240, gpu), withCustom, 1440, gpu));
+
+    // An oversized list (the 121-width one that made VDD create no monitors) is cut back to what is needed.
+    std::string huge = "<vdd_settings><count>3</count><resolutions>";
+    for (int w = 640; w <= 4480; w += 32)
+        huge += "<resolution><width>" + std::to_string(w) + "</width><height>1440</height></resolution>";
+    huge += "</resolutions></vdd_settings>";
+    CHECK(ParseVddSettings(huge).sizes.size() == 121);
+    CHECK(ParseVddSettings(PatchVddSettings(huge, presetWidths, 1440, 240, gpu)).sizes.size() == presetWidths.size());
 
     std::printf(g_failed ? "%d check(s) failed\n" : "all checks passed\n", g_failed);
     return g_failed ? 1 : 0;
