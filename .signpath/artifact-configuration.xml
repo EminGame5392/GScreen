@@ -12,9 +12,6 @@
     <pe-file path="GScreen.Core.exe" product-name="GScreen" product-version="${version}">
       <authenticode-sign />
     </pe-file>
-    <pe-file path="GScreen.Watchdog.exe" product-name="GScreen" product-version="${version}">
-      <authenticode-sign />
-    </pe-file>
     <pe-file path="GScreen.App.exe" product-name="GScreen" product-version="${version}">
       <authenticode-sign />
     </pe-file>

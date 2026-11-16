@@ -26,7 +26,8 @@ struct Layout {
 };
 
 constexpr int kMinZoneWidth = 640;
-constexpr int kWidthAlign = 8;
+// 32 keeps the driver's mode list short (every possible zone width is pre-registered with VDD).
+constexpr int kWidthAlign = 32;
 constexpr int kMaxZones = 3;
 
 // Splits a physical panel of panelW x panelH into side-by-side zones.

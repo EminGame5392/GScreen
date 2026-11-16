@@ -2,6 +2,7 @@
 #include "Json.h"
 #include "Layout.h"
 #include "VddBackend.h"
+#include <algorithm>
 #include <cstdio>
 
 using namespace gs;
@@ -16,8 +17,8 @@ int main() {
     auto z = ComputeZones(5120, 1440, {1, 1, 1});
     CHECK(z.size() == 3);
     CHECK(sumW(z) == 5120);
-    CHECK(z[0].width == 1704 && z[1].width == 1704 && z[2].width == 1712);
-    CHECK(z[1].x == 1704 && z[2].x == 3408);
+    CHECK(z[0].width == 1696 && z[1].width == 1696 && z[2].width == 1728);
+    CHECK(z[1].x == 1696 && z[2].x == 3392);
     for (auto& r : z) CHECK(r.height == 1440);
 
     // 1:2:1 focus layout.
@@ -85,18 +86,29 @@ int main() {
         "    <resolutions>\n        <resolution>\n            <width>800</width>\n            <height>600</height>\n"
         "            <refresh_rate>30</refresh_rate>\n        </resolution>\n    </resolutions>\n"
         "    <options>\n\t\t<HardwareCursor>true</HardwareCursor>\n    </options>\n</vdd_settings>\n";
-    auto zones = ComputeZones(5120, 1440, {1, 1, 1});
-    std::string patched = PatchVddSettings(vddDefault, 3, zones, 240, "NVIDIA GeForce RTX 4060");
+    // Every width ComputeZones can produce is pre-registered, so layouts never need a driver reload.
+    auto grid = ZoneWidthGrid(5120);
+    CHECK(grid.size() == 121 && grid.front() == 640 && grid.back() == 4480);
+    for (auto ratios : std::vector<std::vector<double>>{{1, 1, 1}, {1, 2, 1}, {1, 1}, {7, 3}, {100, 1}, {1, 100, 1}, {0.37, 0.41, 0.22}})
+        for (auto& r : ComputeZones(5120, 1440, ratios))
+            CHECK(std::find(grid.begin(), grid.end(), r.width) != grid.end());
+    auto odd = ZoneWidthGrid(3440); // panel width not a multiple of the alignment
+    for (auto ratios : std::vector<std::vector<double>>{{1, 1, 1}, {1, 1}, {0.37, 0.41, 0.22}})
+        for (auto& r : ComputeZones(3440, 1440, ratios))
+            CHECK(std::find(odd.begin(), odd.end(), r.width) != odd.end());
+
+    std::string patched = PatchVddSettings(vddDefault, 5120, 1440, 240, "NVIDIA GeForce RTX 4060");
     CHECK(patched.find("<count>3</count>") != std::string::npos);
     CHECK(patched.find("<friendlyname>NVIDIA GeForce RTX 4060</friendlyname>") != std::string::npos);
     CHECK(patched.find("<width>800</width>") == std::string::npos);
-    CHECK(patched.find("<width>1704</width>") != std::string::npos);
-    CHECK(patched.find("<width>1712</width>") != std::string::npos);
+    CHECK(patched.find("<width>1696</width>") != std::string::npos);
+    CHECK(patched.find("<width>1728</width>") != std::string::npos);
+    CHECK(patched.find("<width>4480</width>") != std::string::npos);
     CHECK(patched.find("<refresh_rate>240</refresh_rate>") != std::string::npos);
     CHECK(patched.find("<HardwareCursor>true</HardwareCursor>") != std::string::npos); // other options untouched
     CHECK(patched.find("<g_refresh_rate>60</g_refresh_rate>") != std::string::npos);
     // Patching twice is stable.
-    CHECK(PatchVddSettings(patched, 3, zones, 240, "NVIDIA GeForce RTX 4060") == patched);
+    CHECK(PatchVddSettings(patched, 5120, 1440, 240, "NVIDIA GeForce RTX 4060") == patched);
 
     std::printf(g_failed ? "%d check(s) failed\n" : "all checks passed\n", g_failed);
     return g_failed ? 1 : 0;

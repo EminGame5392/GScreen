@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <winrt/base.h>
+#include "Watchdog.h"
 #include "Engine.h"
 #include "IpcServer.h"
 #include "Log.h"
@@ -156,6 +157,11 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR cmdLine, int) {
     LogInit();
     std::wstring args = cmdLine ? cmdLine : L"";
 
+    if (args.find(L"--watchdog") != std::wstring::npos) {
+        size_t at = args.find(L"--pid ");
+        return RunWatchdog(at == std::wstring::npos ? 0 : wcstoul(args.c_str() + at + 6, nullptr, 10));
+    }
+
     if (args.find(L"--restore") != std::wstring::npos) {
         LogInfo("--restore requested");
         g_engine.Init();
@@ -187,9 +193,9 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR cmdLine, int) {
     SetTimer(hwnd, kTickTimer, 500, nullptr);
     UpdateTip(hwnd);
 
-    // The watchdog brings the panel back if this process crashes or hangs (Ctrl+Alt+Shift+R).
-    // Smart App Control can block the unsigned watchdog; then crash recovery and Ctrl+Alt+Shift+R are unavailable.
-    g_engine.SetWatchdogRunning(LaunchSibling(L"GScreen.Watchdog.exe", L"--pid " + std::to_wstring(GetCurrentProcessId())));
+    // The watchdog (this exe in --watchdog mode) brings the panel back if this process crashes or hangs.
+    g_engine.SetWatchdogRunning(
+        LaunchSibling(L"GScreen.Core.exe", L"--watchdog --pid " + std::to_wstring(GetCurrentProcessId())));
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {

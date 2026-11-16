@@ -20,7 +20,6 @@ set TESTS_RC=%ERRORLEVEL%
 set OUT=%ROOT%out\GScreen
 if not exist "%OUT%" mkdir "%OUT%"
 copy /y "%ROOT%build\%CONFIG%\bin\GScreen.Core.exe" "%OUT%\" >nul
-copy /y "%ROOT%build\%CONFIG%\bin\GScreen.Watchdog.exe" "%OUT%\" >nul
 
 if exist "%ROOT%ui\GScreen.App\GScreen.App.csproj" (
   "%ProgramFiles%\dotnet\dotnet.exe" publish "%ROOT%ui\GScreen.App\GScreen.App.csproj" -c %CONFIG% -r win-x64 -o "%OUT%" || exit /b 1

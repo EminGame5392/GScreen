@@ -111,7 +111,8 @@ bool Engine::AttachVirtualDisplays(size_t count) {
 bool Engine::EnterSplit(const Layout& layout, std::string& error) {
     if (!havePanel_) { error = "Не найден физический монитор"; return false; }
     if (!vdd_.IsInstalled()) {
-        error = "Драйвер Virtual Display Driver не установлен или не отвечает";
+        error = "Драйвер Virtual Display Driver не установлен или не отвечает. Если Windows остановила его после сбоя: "
+                "Диспетчер устройств → Видеоадаптеры → Virtual Display Driver → Отключить, затем Включить";
         return false;
     }
     presentation_ = ChoosePresentation();
@@ -124,7 +125,8 @@ bool Engine::EnterSplit(const Layout& layout, std::string& error) {
     int hz = std::min(layout.refreshHz, std::max(60, (int)std::lround(panel_.refreshHz)));
 
     // 1. Virtual monitors with the zone resolutions.
-    if (!vdd_.Configure(zones_, hz, PanelGpuName(panel_))) { error = "Не удалось настроить драйвер VDD"; return false; }
+    const int panelHz = std::max(60, (int)std::lround(panel_.refreshHz));
+    if (!vdd_.Configure(W, H, panelHz, PanelGpuName(panel_))) { error = "Не удалось настроить драйвер VDD"; return false; }
     if (!AttachVirtualDisplays(zones_.size())) { error = "Windows не подключила виртуальные мониторы"; return false; }
 
     auto all = EnumerateDisplays();

@@ -11,20 +11,21 @@ $target = Join-Path $env:LOCALAPPDATA 'Programs\GScreen'
 $shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'GScreen.lnk'
 
 function Stop-GScreen {
+    # The settings window, the watchdog instance of the core (and the pre-0.1.2 GScreen.Watchdog.exe) go first,
+    # so killing the core below does not trigger a crash restore while files are being replaced.
     foreach ($name in 'GScreen.App', 'GScreen.Watchdog') { Get-Process $name -ErrorAction SilentlyContinue | Stop-Process -Force }
-    $core = Get-Process 'GScreen.Core' -ErrorAction SilentlyContinue
-    if ($core) {
-        # A normal exit runs RestoreMerged; give it a chance before killing.
-        $core | ForEach-Object { $_.CloseMainWindow() | Out-Null }
-        $core | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue
-        Get-Process 'GScreen.Core' -ErrorAction SilentlyContinue | Stop-Process -Force
-    }
+    Get-CimInstance Win32_Process -Filter "Name = 'GScreen.Core.exe'" |
+        Where-Object { $_.CommandLine -like '*--watchdog*' } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    Get-Process 'GScreen.Core' -ErrorAction SilentlyContinue | Stop-Process -Force
+    Start-Sleep -Milliseconds 500
+    # Put the plain monitor back in case the core was split.
+    if (Test-Path "$target\GScreen.Core.exe") { Start-Process "$target\GScreen.Core.exe" -ArgumentList '--restore' -Wait }
 }
 
 Stop-GScreen
 
 if ($Uninstall) {
-    if (Test-Path "$target\GScreen.Core.exe") { & "$target\GScreen.Core.exe" --restore | Out-Null }
     Remove-Item $target -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item $shortcut -Force -ErrorAction SilentlyContinue
     Write-Output "GScreen removed. Settings remain in $env:APPDATA\GScreen (delete it to reset)."

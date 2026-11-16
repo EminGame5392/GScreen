@@ -15,7 +15,7 @@
 | Часть | Язык | Что делает |
 |---|---|---|
 | `core/` → `GScreen.Core.exe` | C++20 | Драйвер VDD, раскладка дисплеев, компоновщик, трей, горячие клавиши, IPC |
-| `watchdog/` → `GScreen.Watchdog.exe` | C++ | Возвращает экран, если ядро упало или зависло (`Ctrl+Alt+Shift+R`) |
+| `core/src/Watchdog.cpp` → `GScreen.Core.exe --watchdog` | C++ | Второй процесс ядра без GPU: возвращает экран, если ядро упало или зависло (`Ctrl+Alt+Shift+R`) |
 | `ui/GScreen.App` → `GScreen.App.exe` | C# / WinUI 3 | Окно настроек: пресеты, перетаскивание границ, режимы |
 
 ### Режимы вывода
@@ -86,7 +86,7 @@ build.cmd
 
 Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
 
-* **Signed files:** only `GScreen.Core.exe`, `GScreen.Watchdog.exe`, `GScreen.App.exe` and `GScreen.App.dll`, built from this repository by GitHub Actions. Third-party files in the package keep their original publishers' signatures.
+* **Signed files:** only `GScreen.Core.exe`, `GScreen.App.exe` and `GScreen.App.dll`, built from this repository by GitHub Actions. Third-party files in the package keep their original publishers' signatures.
 * **Team roles:**
   * Committers and reviewers: [@EminGame5392](https://github.com/EminGame5392)
   * Approvers: [@EminGame5392](https://github.com/EminGame5392)

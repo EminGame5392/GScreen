@@ -37,7 +37,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force to-sign | Out-Null
-          'GScreen.Core.exe','GScreen.Watchdog.exe','GScreen.App.exe','GScreen.App.dll' |
+          'GScreen.Core.exe','GScreen.App.exe','GScreen.App.dll' |
             ForEach-Object { Copy-Item "out/GScreen/$_" to-sign/ }
 
       - name: Upload unsigned binaries

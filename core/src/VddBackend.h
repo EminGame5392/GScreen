@@ -12,10 +12,12 @@ public:
     bool IsInstalled() const;       // settings file exists and the pipe answers PING
     bool Ping() const;
 
-    // Writes the monitor count and the zone modes to the settings file, then asks the driver to reload.
-    // Each virtual monitor gets every zone mode, so any zone can land on any monitor.
-    // gpuName pins rendering to the GPU that drives the panel (needed so capture and scanout share one device).
-    bool Configure(const std::vector<ZoneRect>& zones, int refreshHz, const std::string& gpuName);
+    // Makes sure the driver offers kMaxZones monitors with every zone width ComputeZones can produce for
+    // this panel, so changing the layout or refresh is a plain mode switch. Only when the settings file
+    // has to change does it ask the driver to reload — VDD 25.7.23 (mttvdd 2.35.0) crashes on every
+    // reload and Windows disables it after a few crashes, so that must stay rare (first run, new panel).
+    // gpuName pins rendering to the GPU that drives the panel (capture and scanout share one device).
+    bool Configure(int panelW, int panelH, int refreshHz, const std::string& gpuName);
 
     static std::wstring SettingsPath();
 
@@ -30,8 +32,10 @@ std::wstring DecodeVddReply(const unsigned char* data, size_t size);
 // hardware id in the monitor device path (\\?\DISPLAY#MTT1337#...) is what identifies them.
 bool IsVddMonitorPath(const std::wstring& devicePath);
 
+// Every zone width ComputeZones can return for a panel this wide, ascending (exposed for tests).
+std::vector<int> ZoneWidthGrid(int panelW);
+
 // Builds the replacement text for the settings file (exposed for tests).
-std::string PatchVddSettings(const std::string& original, int count, const std::vector<ZoneRect>& zones, int refreshHz,
-                             const std::string& gpuName);
+std::string PatchVddSettings(const std::string& original, int panelW, int panelH, int refreshHz, const std::string& gpuName);
 
 } // namespace gs

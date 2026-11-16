@@ -15,6 +15,7 @@ add_executable(GScreen.Core WIN32
   src/Engine.cpp
   src/IpcServer.cpp
   src/Tray.cpp
+  src/Watchdog.cpp
 )
 
 gscreen_version_resource(GScreen.Core "GScreen core: virtual monitors and compositor")

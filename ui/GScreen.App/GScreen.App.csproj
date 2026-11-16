@@ -19,7 +19,7 @@
          without it the window crashes in InitializeComponent. -->
     <EnableMsixTooling>true</EnableMsixTooling>
     <!-- Keep in sync with project(VERSION) in the root CMakeLists.txt. -->
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <Product>GScreen</Product>
     <Company>GScreen contributors</Company>
     <Copyright>MIT License</Copyright>

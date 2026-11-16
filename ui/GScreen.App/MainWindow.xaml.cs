@@ -21,7 +21,7 @@ public sealed partial class MainWindow : Window
         new("two-halves", "Две половины", [1, 1]),
         new("game-chat", "Игра + чат", [7, 3]),
     ];
-    private const int MinZoneWidth = 640, WidthAlign = 8, DividerPx = 6;
+    private const int MinZoneWidth = 640, WidthAlign = 32, DividerPx = 6; // match core/src/Layout.h
     private static readonly int[] RefreshOptions = [240, 165, 144, 120, 60];
     private static readonly string[] ZoneNames = ["A", "B", "C"];
 
@@ -312,8 +312,8 @@ public sealed partial class MainWindow : Window
             ShowBanner(InfoBarSeverity.Warning, "Последняя ошибка", err);
         else if (s["watchdog"]?.GetValue<bool>() == false && !Banner.IsOpen)
             ShowBanner(InfoBarSeverity.Warning, "Аварийное восстановление недоступно",
-                "Windows (Smart App Control) заблокировала GScreen.Watchdog.exe. Если GScreen зависнет в режиме разделения, " +
-                "экран вернёт запуск «GScreen.Core.exe --restore». Это исправит подписанный релиз или отключение Smart App Control.");
+                "Не удалось запустить сторожевой процесс GScreen. Если GScreen зависнет в режиме разделения, " +
+                "экран вернёт запуск «GScreen.Core.exe --restore».");
 
         string where = presentation switch
         {
