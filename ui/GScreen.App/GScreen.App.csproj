@@ -15,6 +15,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <PublishTrimmed>false</PublishTrimmed>
+    <!-- Unpackaged publish only ships GScreen.App.pri (compiled XAML) with MSIX tooling on;
+         without it the window crashes in InitializeComponent. -->
+    <EnableMsixTooling>true</EnableMsixTooling>
     <!-- Keep in sync with project(VERSION) in the root CMakeLists.txt. -->
     <Version>0.1.1</Version>
     <Product>GScreen</Product>
@@ -28,4 +31,9 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.4" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
   </ItemGroup>
+  <!-- Belt and braces: fail the publish if the PRI did not make it. -->
+  <Target Name="GScreenCheckPri" AfterTargets="Publish">
+    <Copy SourceFiles="$(OutDir)$(TargetName).pri" DestinationFolder="$(PublishDir)" Condition="!Exists('$(PublishDir)$(TargetName).pri') And Exists('$(OutDir)$(TargetName).pri')" />
+    <Error Text="$(TargetName).pri is missing from the publish folder" Condition="!Exists('$(PublishDir)$(TargetName).pri')" />
+  </Target>
 </Project>
