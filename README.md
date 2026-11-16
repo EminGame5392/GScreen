@@ -88,8 +88,8 @@ Free code signing provided by [SignPath.io](https://about.signpath.io), certific
 
 * **Signed files:** only `GScreen.Core.exe`, `GScreen.Watchdog.exe`, `GScreen.App.exe` and `GScreen.App.dll`, built from this repository by GitHub Actions. Third-party files in the package keep their original publishers' signatures.
 * **Team roles:**
-  * Committers and reviewers: [@OWNER](https://github.com/OWNER)
-  * Approvers: [@OWNER](https://github.com/OWNER)
+  * Committers and reviewers: [@EminGame5392](https://github.com/EminGame5392)
+  * Approvers: [@EminGame5392](https://github.com/EminGame5392)
 * **Approval:** every release is approved manually in SignPath before signing.
 * **Privacy policy:** this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. GScreen talks only to its own processes through a local named pipe and to the Virtual Display Driver on the same computer.
 
